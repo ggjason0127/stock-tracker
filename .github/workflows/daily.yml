@@ -1,0 +1,58 @@
+name: 每日抓股價
+
+on:
+  schedule:
+    - cron: '37 8 * * 1-5'    # 台北 16:37（台股盤後資料已更新）
+    - cron: '17 22 * * 1-5'   # 台北隔日 06:17（美股收盤後）
+    - cron: '17 2 11 * *'     # 每月 11 日台北 10:17：抓月營收（上市櫃公司須於 10 日前公布）
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: '回補最近幾天歷史（0 = 不回補，例如 365）'
+        required: false
+        default: '0'
+      revenue:
+        description: '同時抓月營收'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-prices
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 抓股價
+        run: python fetch_prices.py --backfill "${{ github.event.inputs.backfill || '0' }}"
+
+      - name: 抓 EPS（官方本益比、月營收推估、分析師共識）
+        run: |
+          if [ "${{ github.event.schedule }}" = "17 2 11 * *" ] || [ "${{ github.event.inputs.revenue }}" = "true" ]; then
+            python fetch_estimates.py --revenue
+          else
+            python fetch_estimates.py
+          fi
+        continue-on-error: true
+
+      - name: 收集公司活動（重大訊息、除權息預告、美股財報日）
+        run: python fetch_events.py
+        continue-on-error: true
+
+      - name: 提交資料
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data
+          git diff --staged --quiet || git commit -m "data: $(TZ=Asia/Taipei date '+%F %H:%M')"
+          git push

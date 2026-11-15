@@ -1,0 +1,47 @@
+{
+  "groups": [
+    { "id": "fiti", "name": "天鈺 4961 同業" },
+    { "id": "cyber", "name": "資安類股" },
+    { "id": "jentech", "name": "健策 3653" }
+  ],
+  "stocks": [
+    { "code": "4961", "name": "天鈺", "market": "TW", "groups": ["fiti"] },
+    { "code": "3034", "name": "聯詠", "market": "TW", "groups": ["fiti"] },
+    { "code": "3592", "name": "瑞鼎", "market": "TW", "groups": ["fiti"] },
+    { "code": "8016", "name": "矽創", "market": "TW", "groups": ["fiti"] },
+    { "code": "3545", "name": "敦泰", "market": "TW", "groups": ["fiti"] },
+    { "code": "6962", "name": "奕力-KY", "market": "TW", "groups": ["fiti"] },
+    { "code": "4966", "name": "譜瑞-KY", "market": "TW", "groups": ["fiti"] },
+    { "code": "HIMX", "name": "Himax", "market": "US", "groups": ["fiti"] },
+    { "code": "SYNA", "name": "Synaptics", "market": "US", "groups": ["fiti"] },
+    { "code": "MPWR", "name": "Monolithic Power", "market": "US", "groups": ["fiti"] },
+    { "code": "POWI", "name": "Power Integrations", "market": "US", "groups": ["fiti"] },
+
+    { "code": "7765", "name": "中華資安", "market": "TW", "groups": ["cyber"] },
+    { "code": "6690", "name": "安碁資訊", "market": "TW", "groups": ["cyber"] },
+    { "code": "3664", "name": "安瑞-KY", "market": "TW", "groups": ["cyber"] },
+    { "code": "6214", "name": "精誠", "market": "TW", "groups": ["cyber"] },
+    { "code": "2480", "name": "敦陽科", "market": "TW", "groups": ["cyber"] },
+    { "code": "3029", "name": "零壹", "market": "TW", "groups": ["cyber"] },
+    { "code": "2453", "name": "凌群", "market": "TW", "groups": ["cyber"] },
+    { "code": "6752", "name": "叡揚", "market": "TW", "groups": ["cyber"] },
+    { "code": "6245", "name": "立端", "market": "TW", "groups": ["cyber"] },
+    { "code": "6865", "name": "偉康科技", "market": "TW", "groups": ["cyber"] },
+    { "code": "6148", "name": "驊宏資", "market": "TW", "groups": ["cyber"] },
+    { "code": "6689", "name": "伊雲谷", "market": "TW", "groups": ["cyber"] },
+    { "code": "6112", "name": "邁達特", "market": "TW", "groups": ["cyber"] },
+    { "code": "2468", "name": "華經", "market": "TW", "groups": ["cyber"] },
+    { "code": "PANW", "name": "Palo Alto Networks", "market": "US", "groups": ["cyber"] },
+    { "code": "CRWD", "name": "CrowdStrike", "market": "US", "groups": ["cyber"] },
+    { "code": "FTNT", "name": "Fortinet", "market": "US", "groups": ["cyber"] },
+    { "code": "ZS", "name": "Zscaler", "market": "US", "groups": ["cyber"] },
+    { "code": "CHKP", "name": "Check Point", "market": "US", "groups": ["cyber"] },
+    { "code": "OKTA", "name": "Okta", "market": "US", "groups": ["cyber"] },
+    { "code": "S", "name": "SentinelOne", "market": "US", "groups": ["cyber"] },
+    { "code": "TENB", "name": "Tenable", "market": "US", "groups": ["cyber"] },
+    { "code": "QLYS", "name": "Qualys", "market": "US", "groups": ["cyber"] },
+    { "code": "GEN", "name": "Gen Digital", "market": "US", "groups": ["cyber"] },
+
+    { "code": "3653", "name": "健策", "market": "TW", "groups": ["jentech"] }
+  ]
+}

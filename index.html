@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每日股價追蹤</title>
+<style>
+  :root{
+    --bg:#eef2f7; --panel:#ffffff; --ink:#18212e; --muted:#6b7686; --line:#dde3ec;
+    --up:#d23b3b; --down:#1e9e5a; --flat:#6b7686; --accent:#2f6fb5; --hover:#f3f6fa;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0e1622; --panel:#16202e; --ink:#e7ecf3; --muted:#8e9aab; --line:#253246;
+      --up:#ff6b6b; --down:#3ecf85; --accent:#7fb0e0; --hover:#1c2838; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:16px}
+  h1{font-size:22px;margin:0;letter-spacing:.02em}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  select,button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+  button:hover,select:hover{border-color:var(--muted)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:0;border-radius:0;padding:6px 10px}
+  .seg button.on{background:var(--ink);color:var(--bg)}
+  #grp{flex-wrap:wrap}
+  tr.mh td{background:var(--bg);font-size:12px;color:var(--muted);padding:6px 12px;cursor:default;text-align:left}
+  tr.mh:hover{background:none}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;display:none;z-index:9}
+  .banner{background:#fff4d6;color:#6b5200;border:1px solid #f0dc9c;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+  @media (prefers-color-scheme: dark){.banner{background:#3a3115;color:#f3dc90;border-color:#5a4a1c}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 12px;text-align:right;white-space:nowrap}
+  th{font-size:12px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+  th:first-child,td:first-child{text-align:left}
+  tbody tr{border-bottom:1px solid var(--line);cursor:pointer}
+  tbody tr:last-child{border-bottom:0}
+  tbody tr:hover{background:var(--hover)}
+  tbody tr.sel{background:var(--hover);box-shadow:inset 3px 0 0 var(--accent)}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .code{font-family:var(--mono);color:var(--muted);font-size:12px;margin-right:6px}
+  .tag{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px}
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
+  .stale{color:var(--muted);font-size:11px;margin-left:4px}
+  .detail{margin-top:16px;padding:16px}
+  .dhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+  .dname{font-size:18px;font-weight:600}
+  .dprice{font-family:var(--mono);font-size:22px}
+  .chart{position:relative;width:100%;height:260px}
+  .chart svg{width:100%;height:100%;display:block}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%);display:none}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:12px}
+  .stat{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .stat .k{font-size:11px;color:var(--muted)} .stat .v{font-family:var(--mono);font-size:15px;margin-top:2px}
+  .hist{margin-top:12px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .hist th{position:sticky;top:0;background:var(--panel);cursor:default}
+  .hist tr{cursor:default}
+  .tabs{display:flex;gap:4px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+  .tabs button{border:0;border-radius:0;background:none;padding:8px 14px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+  .pad{padding:14px 16px;margin-bottom:12px}
+  .card h3{font-size:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .card h3 small{font-weight:400;color:var(--muted);font-size:12px}
+  .mbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .mbar select{flex:1;min-width:200px;font-size:15px;padding:8px 10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr}}
+  .grid2 > .card{margin-bottom:0}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center;font-size:14px}
+  .kv label{color:var(--muted);font-size:13px}
+  input.in,select.in{font:inherit;font-family:var(--mono);font-size:14px;width:100%;max-width:130px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);text-align:right}
+  input.in.sm,select.in.sm{max-width:78px;padding:4px 6px}
+  input.in:focus,select.in:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .mt td,.mt th{padding:7px 8px;font-size:13px}
+  .mt tbody tr{cursor:default}
+  .mt td:nth-child(2),.mt th:nth-child(2){text-align:left}
+  .mt.sens td:nth-child(2),.mt.sens th:nth-child(2){text-align:right}
+  .grid2 .mt td:nth-child(2),.grid2 .mt th:nth-child(2){text-align:right}
+  .mt tr.off td{color:var(--muted);opacity:.6}
+  .hero{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline}
+  .hero .big{font-family:var(--mono);font-size:26px}
+  .chip{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;white-space:nowrap}
+  .s-off{background:#e3effd;color:#1d5fa8} .s-est{background:#fdf0dc;color:#8a5a00} .s-con{background:#ece6fb;color:#5b3fb0} .s-man{background:#e6f5ec;color:#1e7a46}
+  @media (prefers-color-scheme: dark){ .s-off{background:#16304f;color:#9cc6f5} .s-est{background:#3d2e12;color:#f0c879} .s-con{background:#2c2350;color:#c4b5f5} .s-man{background:#16362a;color:#8fdcae} }
+  .epsrow{display:grid;grid-template-columns:96px 120px 1fr;gap:4px 10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .epsrow:last-of-type{border-bottom:0}
+  .epsrow .why{grid-column:2 / 4;font-size:11.5px;color:var(--muted);line-height:1.45}
+  .linkbtn{border:0;background:none;color:var(--accent);padding:0 2px;font-size:12px;cursor:pointer;text-decoration:underline}
+  .pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+  .scen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .scen .box{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .scen .lab{font-size:12px;color:var(--muted)} .scen .tp{font-family:var(--mono);font-size:22px;margin:2px 0}
+  .scen .sub{font-size:12px;font-family:var(--mono);color:var(--muted)}
+  .wt{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--hover);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center}
+  .sens td.hi{font-weight:600}
+  .warn{color:#b26a00;font-size:13px} @media (prefers-color-scheme: dark){.warn{color:#f3b45a}}
+  .note{font-size:13px;color:var(--muted);line-height:1.6}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+  .modal .box{background:var(--panel);border-radius:12px;padding:16px;width:min(680px,100%);max-height:90vh;display:flex;flex-direction:column;gap:10px}
+  .modal textarea{width:100%;height:50vh;font-family:var(--mono);font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+  .ev td{vertical-align:top}
+  .ev .dd{font-family:var(--mono);white-space:nowrap}
+  .ev .det{font-size:12px;color:var(--muted);white-space:normal;max-width:520px;margin-top:2px}
+  .ev td:nth-child(3){white-space:normal;text-align:left}
+  .t-法說會{background:#e3effd;color:#1d5fa8} .t-股東會{background:#ece6fb;color:#5b3fb0} .t-股利{background:#fdf0dc;color:#8a5a00}
+  .t-財報{background:#e6f5ec;color:#1e7a46} .t-董事會{background:#eef1f5;color:#4a5568} .t-庫藏股{background:#fde8e8;color:#b42318}
+  @media (prefers-color-scheme: dark){ .t-法說會{background:#16304f;color:#9cc6f5} .t-股東會{background:#2c2350;color:#c4b5f5} .t-股利{background:#3d2e12;color:#f0c879} .t-財報{background:#16362a;color:#8fdcae} .t-董事會{background:#253246;color:#c3cddb} .t-庫藏股{background:#4a1d1d;color:#f5a3a3} }
+  .soon{font-size:11px;color:var(--accent);display:block}
+  footer{color:var(--muted);font-size:12px;margin-top:20px;line-height:1.6}
+  @media (max-width:600px){
+    .hide-sm,.card > table .tag{display:none}
+    th,td{padding:9px 8px}
+    .card > table td:first-child{white-space:normal}
+    .card > table .stale{display:block;margin:2px 0 0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>每日股價追蹤</h1>
+      <div class="sub" id="updated">載入中…</div>
+    </div>
+    <div class="controls">
+      <div class="seg" id="grp"></div>
+      <select id="date" title="選擇日期，查看同一天的收盤價"></select>
+      <button id="copy" title="複製目前分頁的統一日收盤價，可直接貼到 Excel">複製價格</button>
+      <button id="csv">下載 CSV</button>
+    </div>
+  </header>
+  <div id="banner"></div>
+  <nav class="tabs"><button data-v="prices" class="on">股價</button><button data-v="model">估值模型</button><button data-v="report">月報</button></nav>
+
+  <section id="vPrices">
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th data-k="name">股票</th>
+        <th data-k="c">收盤</th>
+        <th data-k="chg" class="hide-sm">漲跌</th>
+        <th data-k="pct">漲跌幅</th>
+        <th data-k="v" class="hide-sm">成交量</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="card detail" id="detail" style="display:none">
+    <div class="dhead">
+      <div><span class="dname" id="dname"></span> <span class="code" id="dcode"></span> <button id="toModel" style="padding:3px 10px;font-size:13px">看估值模型 →</button></div>
+      <div class="seg" id="range">
+        <button data-r="22">1月</button><button data-r="66" class="on">3月</button><button data-r="132">6月</button><button data-r="252">1年</button><button data-r="0">全部</button>
+      </div>
+    </div>
+    <div class="dprice" id="dprice"></div>
+    <div class="chart" id="chart"><svg id="svg"></svg><div class="tip" id="tip"></div></div>
+    <div class="stats" id="stats"></div>
+    <div class="hist"><table>
+      <thead><tr><th>日期</th><th>開</th><th>高</th><th>低</th><th>收</th><th>漲跌</th><th class="hide-sm">成交量</th></tr></thead>
+      <tbody id="hrows"></tbody>
+    </table></div>
+  </div>
+
+  </section>
+
+  <section id="vModel" style="display:none">
+    <div class="mbar">
+      <select id="mStock"></select>
+      <button id="mExport">匯出設定</button>
+      <button id="mReset">清除本機修改</button>
+    </div>
+    <div id="mLocal" class="note" style="margin:-4px 0 10px"></div>
+    <div id="mBody"></div>
+  </section>
+
+  <section id="vReport" style="display:none"><div id="rBody"></div></section>
+
+  <div class="modal" id="modal"><div class="box">
+    <b>匯出估值設定</b>
+    <div class="note">把下面內容整個貼到 repo 的 <code>fundamentals.json</code>（取代原內容）並 commit，所有裝置就會用這份設定。</div>
+    <textarea id="mJson" readonly></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button id="mCopyJson">複製</button><button id="mClose">關閉</button></div>
+  </div></div>
+
+  <footer>
+    台股：證交所 / 櫃買中心 OpenAPI 盤後資料；美股與歷史回補：Yahoo Finance。台股紅漲綠跌。<br>
+    估值模型為研究工具：EPS 與評分是假設輸入，結果不構成投資建議。<br>
+    要改追蹤的股票，編輯 repo 裡的 <code>watchlist.json</code>；資料每個交易日由 GitHub Actions 自動更新。
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+let DB = null, group = "ALL", sortKey = null, sortDir = -1, selected = null, range = 66;
+
+/* ---------- 載入資料 ---------- */
+async function load(){
+  try{
+    const r = await fetch("data/prices.json?t=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error(r.status);
+    DB = await r.json();
+    if(!DB.stocks || !Object.keys(DB.stocks).length) throw new Error("empty");
+  }catch(e){
+    DB = {stocks:{}, groups:[]};
+    $("#banner").innerHTML = '<div class="banner">還沒有股價資料。請到 GitHub 的 Actions 手動執行一次「每日抓股價」。</div>';
+  }
+  if(DB.demo) $("#banner").innerHTML = '<div class="banner">目前顯示的是<b>示範股價</b>（隨機產生，非真實價格；有 11/06 收盤價的股票以該價為中心）。部署到 GitHub 並執行一次 Actions 後就會換成真實資料。</div>';
+  await loadFund();
+  $("#updated").textContent = "最後更新：" + (DB.updated || "—") + "（台北時間）";
+  buildGroups(); buildDates();
+  const first = stocks()[0]; if(first) selected = first.code;
+  render();
+  buildModelSelect();
+  const h = decodeURIComponent(location.hash.slice(1));
+  if(h.startsWith("m-") && DB.stocks[h.slice(2)]) openModel(h.slice(2));
+}
+
+function stocks(){
+  return Object.entries(DB.stocks)
+    .filter(([c,s]) => !s.hidden && s.history && s.history.length)
+    .filter(([c,s]) => group === "ALL" || (s.groups||[]).includes(group))
+    .map(([c,s]) => ({code:c, ...s}))
+    .sort((a,b) => (a.market===b.market?0:a.market==="TW"?-1:1) || (a.order??999)-(b.order??999));
+}
+
+function buildGroups(){
+  const gs = [{id:"ALL",name:"全部"}, ...(DB.groups||[])];
+  $("#grp").innerHTML = gs.map(g=>`<button data-g="${g.id}" class="${g.id===group?"on":""}">${g.name}</button>`).join("");
+  document.querySelectorAll("#grp button").forEach(b => b.onclick = () => {
+    group = b.dataset.g; buildGroups(); buildDates(); buildModelSelect(); if(view==="report") renderReport();
+    const f = stocks()[0]; selected = f ? f.code : null; if(!f) $("#detail").style.display="none";
+    render();
+  });
+}
+
+/* 每個市場的統一日 = 該市場（目前分頁）最新的交易日 */
+function unified(){
+  const u = {};
+  stocks().forEach(s => { const d = s.history[s.history.length-1].d; if(!u[s.market] || d > u[s.market]) u[s.market] = d; });
+  return u;
+}
+
+function buildDates(){
+  const set = new Set();
+  stocks().forEach(s => s.history.forEach(h => set.add(h.d)));
+  const ds = [...set].sort().reverse();
+  const sel = $("#date"), cur = sel.value;
+  sel.innerHTML = '<option value="">統一日（各市場最新）</option>' + ds.map(d => `<option value="${d}">${d}</option>`).join("");
+  if(ds.includes(cur)) sel.value = cur;
+}
+
+/* 取某檔在指定日期（或之前最近一日）的資料 */
+function barAt(s, d){
+  const h = s.history;
+  for(let i=h.length-1;i>=0;i--) if(h[i].d <= d) return {bar:h[i], prev:h[i-1], exact:h[i].d===d};
+  return {bar:null};
+}
+
+/* ---------- 格式 ---------- */
+const fmt = (x, dp) => x==null ? "—" : Number(x).toLocaleString("en-US",{minimumFractionDigits:dp,maximumFractionDigits:dp});
+const dpOf = s => s.market === "US" ? 2 : 2;
+const cls = x => x==null||x===0 ? "flat" : x>0 ? "up" : "down";
+const sign = x => x>0 ? "+" : "";
+function vol(v, mkt){
+  if(v==null) return "—";
+  if(mkt==="TW") return fmt(v/1000,0) + " 張";
+  if(v>=1e6) return fmt(v/1e6,1) + "M";
+  return fmt(v,0);
+}
+
+/* ---------- 總表 ---------- */
+function rowsFor(){
+  const sel = $("#date").value, u = unified();
+  return stocks().map(s => {
+    const d = sel || u[s.market];
+    const {bar, prev, exact} = barAt(s, d);
+    const chg = bar ? (bar.chg ?? (prev ? bar.c - prev.c : null)) : null;
+    const base = bar && chg!=null ? bar.c - chg : null;
+    return {...s, d, bar, exact, chg, pct: base ? chg/base*100 : null, c: bar?.c, v: bar?.v};
+  });
+}
+
+function render(){
+  let list = rowsFor();
+  if(sortKey){
+    list.sort((a,b) => {
+      const x=a[sortKey], y=b[sortKey];
+      if(a.market!==b.market) return a.market==="TW"?-1:1;
+      if(typeof x==="string") return sortDir * x.localeCompare(y,"zh-Hant");
+      return sortDir * ((x??-Infinity) - (y??-Infinity));
+    });
+  }
+  let lastM = null;
+  $("#rows").innerHTML = list.map(s => {
+    let head = "";
+    if(s.market !== lastM){ lastM = s.market;
+      head = `<tr class="mh"><td colspan="5">${s.market==="TW"?"台股（新台幣）":"美股（美元）"} · ${$("#date").value?"指定日":"統一日"} ${s.d||"—"}</td></tr>`; }
+    return head + rowHtml(s);
+  }).join("") || `<tr><td colspan="5" class="flat" style="text-align:center">沒有資料</td></tr>`;
+  document.querySelectorAll("#rows tr[data-c]").forEach(tr => tr.onclick = () => select(tr.dataset.c));
+  if(selected && DB.stocks[selected]) renderDetail();
+}
+
+function rowHtml(s){
+    if(!s.bar) return `<tr data-c="${s.code}"><td><span class="code">${s.code}</span>${s.name||""}</td><td colspan="4" class="flat">此日期無資料</td></tr>`;
+    const dp = dpOf(s);
+    return `<tr data-c="${s.code}" class="${s.code===selected?"sel":""}">
+      <td><span class="code">${s.code}</span>${s.name||""}<span class="tag">${s.exchange||s.market}</span>${!s.exact?`<span class="stale">⚠ ${s.bar.d} 收盤（非統一日）</span>`:""}</td>
+      <td class="num">${fmt(s.c,dp)}</td>
+      <td class="num hide-sm ${cls(s.chg)}">${s.chg==null?"—":sign(s.chg)+fmt(s.chg,dp)}</td>
+      <td class="num ${cls(s.chg)}">${s.pct==null?"—":sign(s.pct)+fmt(s.pct,2)+"%"}</td>
+      <td class="num hide-sm">${vol(s.v,s.market)}</td></tr>`;
+}
+
+/* ---------- 個股明細 ---------- */
+function select(code){ selected = code; render(); renderDetail(); $("#detail").scrollIntoView({behavior:"smooth",block:"nearest"}); }
+
+function renderDetail(){
+  const s = {code:selected, ...DB.stocks[selected]};
+  const h = s.history, dp = dpOf(s);
+  const view = range ? h.slice(-range) : h;
+  const last = h[h.length-1];
+  $("#detail").style.display = "";
+  $("#dname").textContent = s.name || s.code;
+  $("#dcode").textContent = s.code + " · " + (s.exchange||s.market);
+  const pc = last.chg!=null && last.c-last.chg ? last.chg/(last.c-last.chg)*100 : null;
+  $("#dprice").innerHTML = `${fmt(last.c,dp)} <span class="${cls(last.chg)}" style="font-size:15px">${last.chg==null?"":sign(last.chg)+fmt(last.chg,dp)} ${pc==null?"":"("+sign(pc)+fmt(pc,2)+"%)"}</span> <span class="stale" style="font-size:12px">${last.d}</span>`;
+  drawChart(view, dp);
+
+  const cs = view.map(b=>b.c), hi = Math.max(...view.map(b=>b.h??b.c)), lo = Math.min(...view.map(b=>b.l??b.c));
+  const first = view[0].c, ret = (last.c/first-1)*100;
+  const ma = n => h.length>=n ? h.slice(-n).reduce((a,b)=>a+b.c,0)/n : null;
+  $("#stats").innerHTML = [
+    ["區間報酬", `<span class="${cls(ret)}">${sign(ret)}${fmt(ret,2)}%</span>`],
+    ["區間最高", fmt(hi,dp)], ["區間最低", fmt(lo,dp)],
+    ["MA5", fmt(ma(5),dp)], ["MA20", fmt(ma(20),dp)], ["MA60", fmt(ma(60),dp)],
+  ].map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
+  $("#hrows").innerHTML = view.slice().reverse().map(b=>`<tr>
+    <td class="num">${b.d}</td><td class="num">${fmt(b.o,dp)}</td><td class="num">${fmt(b.h,dp)}</td><td class="num">${fmt(b.l,dp)}</td>
+    <td class="num">${fmt(b.c,dp)}</td><td class="num ${cls(b.chg)}">${b.chg==null?"—":sign(b.chg)+fmt(b.chg,dp)}</td>
+    <td class="num hide-sm">${vol(b.v,s.market)}</td></tr>`).join("");
+}
+
+function drawChart(view, dp){
+  const svg = $("#svg"), box = $("#chart").getBoundingClientRect();
+  const W = box.width, H = box.height, P = {l:8, r:66, t:12, b:24};
+  const cs = view.map(b=>b.c), min = Math.min(...cs), max = Math.max(...cs), pad = (max-min)*0.08 || max*0.01;
+  const y0 = min-pad, y1 = max+pad;
+  const X = i => P.l + (view.length<2 ? 0 : i*(W-P.l-P.r)/(view.length-1));
+  const Y = v => P.t + (1-(v-y0)/(y1-y0))*(H-P.t-P.b);
+  const up = cs[cs.length-1] >= cs[0];
+  const col = getComputedStyle(document.documentElement).getPropertyValue(up?"--up":"--down").trim();
+  const line = view.map((b,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(b.c).toFixed(1)}`).join("");
+  const area = line + `L${X(view.length-1)},${H-P.b}L${X(0)},${H-P.b}Z`;
+  let grid = "";
+  for(let k=0;k<=3;k++){
+    const v = y0 + (y1-y0)*k/3, y = Y(v);
+    grid += `<line x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}" stroke="var(--line)"/>
+             <text x="${W-P.r+6}" y="${y+4}" font-size="11" fill="var(--muted)" font-family="var(--mono)">${fmt(v,dp)}</text>`;
+  }
+  const ticks = [0, Math.floor((view.length-1)/2), view.length-1].filter((v,i,a)=>a.indexOf(v)===i)
+    .map(i=>`<text x="${X(i)}" y="${H-6}" font-size="11" fill="var(--muted)" text-anchor="${i===0?"start":i===view.length-1?"end":"middle"}">${view[i].d}</text>`).join("");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".18"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<path d="${area}" fill="url(#g)"/><path d="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>
+    ${ticks}<line id="cross" y1="${P.t}" y2="${H-P.b}" stroke="var(--muted)" stroke-dasharray="3 3" style="display:none"/><circle id="dot" r="4" fill="${col}" style="display:none"/>`;
+  const tip = $("#tip"), cross = svg.querySelector("#cross"), dot = svg.querySelector("#dot");
+  svg.onpointermove = e => {
+    const r = svg.getBoundingClientRect(), x = e.clientX - r.left;
+    const i = Math.max(0, Math.min(view.length-1, Math.round((x-P.l)/((W-P.l-P.r)/Math.max(1,view.length-1)))));
+    const b = view[i];
+    cross.setAttribute("x1",X(i)); cross.setAttribute("x2",X(i)); cross.style.display="";
+    dot.setAttribute("cx",X(i)); dot.setAttribute("cy",Y(b.c)); dot.style.display="";
+    tip.style.display="block"; tip.style.left = X(i)+"px"; tip.style.top = Y(b.c)+"px";
+    tip.textContent = `${b.d}  ${fmt(b.c,dp)}`;
+  };
+  svg.onpointerleave = () => { tip.style.display="none"; cross.style.display="none"; dot.style.display="none"; };
+}
+
+/* ---------- 複製到 Excel ---------- */
+async function copyPrices(){
+  const lines = [["代號","名稱","市場","日期","收盤價","漲跌","漲跌幅%"].join("\t")];
+  rowsFor().forEach(s => { if(s.bar) lines.push([s.code,s.name||"",s.market,s.bar.d,s.c,s.chg??"",s.pct==null?"":s.pct.toFixed(2)].join("\t")); });
+  try{ await navigator.clipboard.writeText(lines.join("\n")); toast("已複製 "+(lines.length-1)+" 檔，可直接貼到 Excel"); }
+  catch(e){ toast("瀏覽器不允許複製，請改用下載 CSV"); }
+}
+function toast(t){ const el=$("#toast"); el.textContent=t; el.style.display="block"; clearTimeout(el._t); el._t=setTimeout(()=>el.style.display="none",2200); }
+
+/* ---------- CSV ---------- */
+function downloadCSV(){
+  const rows = [["代號","名稱","市場","日期","開盤","最高","最低","收盤","漲跌","成交量"]];
+  stocks().forEach(s => s.history.forEach(b => rows.push([s.code,s.name||"",s.exchange||s.market,b.d,b.o,b.h,b.l,b.c,b.chg,b.v])));
+  const csv = "﻿" + rows.map(r=>r.map(x=>x==null?"":`"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download = `prices_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+}
+
+
+/* =================== 估值模型 =================== */
+const BASIS = {ttm:"近四季", fy26:"今年預估", fy27:"明年預估"};
+const DEF_SET = {adjPerPoint:0.10, peCap:40, probs:[0.2,0.5,0.3],
+  factors:[["規模與市場地位",.2],["客戶集中與地區風險",.15],["獲利能力與毛利趨勢",.2],["成長動能",.2],["財務風險（槓桿與流動性）",.15],["獲利品質與景氣循環",.1]]};
+let EST = {stocks:{}}, EVENTS = {events:[]}, REV = {};
+let FUND = {settings:{}, stocks:{}}, LOCAL = {settings:{}, stocks:{}}, mCode = null, view = "prices";
+
+async function loadFund(){
+  try{ const r = await fetch("fundamentals.json?t="+Date.now(), {cache:"no-store"}); if(r.ok) FUND = await r.json(); }catch(e){}
+  FUND.settings = Object.assign({}, DEF_SET, FUND.settings||{}); FUND.stocks = FUND.stocks || {};
+  try{ const r = await fetch("data/estimates.json?t="+Date.now(), {cache:"no-store"}); if(r.ok) EST = await r.json(); }catch(e){}
+  try{ const r = await fetch("data/events.json?t="+Date.now(), {cache:"no-store"}); if(r.ok) EVENTS = await r.json(); }catch(e){}
+  try{ const r = await fetch("data/revenue.json?t="+Date.now(), {cache:"no-store"}); if(r.ok) REV = await r.json(); }catch(e){}
+  EST.stocks = EST.stocks || {};
+  try{ const l = JSON.parse(localStorage.getItem("valuationLocal")||"null"); if(l) LOCAL = l; }catch(e){}
+  LOCAL.settings = LOCAL.settings||{}; LOCAL.stocks = LOCAL.stocks||{};
+}
+const SET = () => ({...FUND.settings, ...LOCAL.settings});
+const FS = c => ({...(FUND.stocks[c]||{}), ...(LOCAL.stocks[c]||{})});
+function setF(c,k,v){ (LOCAL.stocks[c] = LOCAL.stocks[c]||{})[k] = v; saveLocal(); }
+function setS(k,v){ LOCAL.settings[k] = v; saveLocal(); }
+function saveLocal(){ try{ localStorage.setItem("valuationLocal", JSON.stringify(LOCAL)); }catch(e){} }
+const numOrNull = v => (v===""||v==null||isNaN(+v)) ? null : +v;
+
+function globalUnified(){
+  const u = {};
+  Object.values(DB.stocks).forEach(s => { if(s.hidden||!s.history?.length) return; const d=s.history[s.history.length-1].d; if(!u[s.market]||d>u[s.market]) u[s.market]=d; });
+  return u;
+}
+function priceOf(code){
+  const s = DB.stocks[code]; if(!s||!s.history?.length) return null;
+  const d = $("#date").value || globalUnified()[s.market];
+  const {bar, exact} = barAt(s, d); return bar ? {p:bar.c, d:bar.d, exact} : null;
+}
+/* EPS：手動（網頁或 fundamentals.json）優先，否則用每日自動抓取的值 */
+function epsInfo(c,b){
+  const m = numOrNull(FS(c)["eps_"+b]), a = (EST.stocks[c]||{})[b] || null;
+  if(m != null) return {v:m, src:"手動", auto:a, manual:true};
+  if(a && a.v != null) return {v:+a.v, src:a.src, auto:a, manual:false};
+  return {v:null, src:null, auto:null, manual:false};
+}
+const epsOf = (c,b) => epsInfo(c,b).v;
+const SRC_CLS = {"官方":"s-off","月營收推估":"s-est","分析師共識":"s-con","Yahoo":"s-con","手動":"s-man"};
+const srcChip = src => src ? `<span class="chip ${SRC_CLS[src]||""}">${src}</span>` : "";
+function quart(arr,q){ const a=[...arr].sort((x,y)=>x-y), pos=(a.length-1)*q, lo=Math.floor(pos), hi=Math.ceil(pos); return a[lo]+(a[hi]-a[lo])*(pos-lo); }
+function peersOf(code){
+  const t = DB.stocks[code], f = FS(code);
+  if(Array.isArray(f.peers)) return f.peers.filter(c => DB.stocks[c]);
+  return Object.keys(DB.stocks).filter(c => c!==code && !DB.stocks[c].hidden && DB.stocks[c].market===t.market &&
+    (DB.stocks[c].groups||[]).some(g => (t.groups||[]).includes(g))).sort((a,b)=>(DB.stocks[a].order??999)-(DB.stocks[b].order??999));
+}
+
+function calc(code){
+  const st = SET(), f = FS(code), basis = f.basis || "ttm", pick = f.pick || {};
+  const px = priceOf(code), eps = epsOf(code, basis);
+  const peers = peersOf(code).map(c => {
+    const pp = priceOf(c), e = epsOf(c, basis), pe = pp && e>0 ? pp.p/e : null;
+    const auto = pe!=null && pe <= st.peCap;
+    return {c, name:DB.stocks[c].name, px:pp, eps:e, pe, auto, inc: pe!=null && (c in pick ? pick[c] : auto), forced: c in pick};
+  });
+  const pes = peers.filter(x => x.inc).map(x => x.pe);
+  const stats = pes.length >= 2 ? {n:pes.length, min:Math.min(...pes), q1:quart(pes,.25), med:quart(pes,.5),
+    mean:pes.reduce((a,b)=>a+b,0)/pes.length, q3:quart(pes,.75), max:Math.max(...pes)} : null;
+  const manual = Array.isArray(f.manualPE) && f.manualPE.every(x => numOrNull(x)>0) ? f.manualPE.map(Number) : null;
+  let base = null, src = "none";
+  if(stats && !f.useManual){ base = [stats.q1, stats.med, stats.q3]; src = "peers"; }
+  else if(manual){ base = manual; src = "manual"; }
+  const scores = st.factors.map((_,i) => +((f.scores||[])[i] || 0));
+  const wsum = st.factors.reduce((a,[n,w],i) => a + (+w)*scores[i], 0);
+  const adj = 1 + wsum * st.adjPerPoint;
+  const pe3 = base ? base.map(x => x*adj) : null;
+  const tgt = pe3 && eps>0 ? pe3.map(x => x*eps) : null;
+  const probs = (f.probs || st.probs).map(Number), psum = probs.reduce((a,b)=>a+b,0) || 1;
+  const wt = tgt ? tgt.reduce((a,t,i) => a + t*probs[i], 0) / psum : null;
+  return {st, f, basis, px, eps, peers, stats, manual, base, src, scores, wsum, adj, pe3, tgt, probs, psum, wt,
+          curPE: px && eps>0 ? px.p/eps : null};
+}
+
+function buildModelSelect(){
+  const sel = $("#mStock"); if(!sel) return;
+  const gs = (DB.groups||[]).filter(g => group==="ALL" || g.id===group);
+  let html = "";
+  gs.forEach(g => {
+    const list = Object.entries(DB.stocks).filter(([c,s]) => !s.hidden && (s.groups||[]).includes(g.id))
+      .sort((a,b) => (a[1].market===b[1].market?0:a[1].market==="TW"?-1:1) || (a[1].order??999)-(b[1].order??999));
+    if(list.length) html += `<optgroup label="${g.name}">` + list.map(([c,s]) => `<option value="${c}">${c}　${s.name||""}${s.market==="US"?"（美）":""}</option>`).join("") + `</optgroup>`;
+  });
+  sel.innerHTML = html;
+  if(mCode && [...sel.options].some(o=>o.value===mCode)) sel.value = mCode; else mCode = sel.value || null;
+}
+
+function openModel(code){ mCode = code; switchView("model"); buildModelSelect(); $("#mStock").value = code; renderModel(); }
+function switchView(v){
+  view = v;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.v===v));
+  $("#vPrices").style.display = v==="prices" ? "" : "none";
+  $("#vModel").style.display = v==="model" ? "" : "none";
+  $("#vReport").style.display = v==="report" ? "" : "none";
+  $("#copy").style.display = $("#csv").style.display = v==="prices" ? "" : "none";
+  if(v==="model"){ if(!mCode) buildModelSelect(); renderModel(); }
+  if(v==="report") renderReport();
+}
+
+const pct = x => x==null ? "—" : sign(x)+fmt(x*100,1)+"%";
+const xx = x => x==null ? "—" : fmt(x,1)+"x";
+
+function renderModel(){
+  const box = $("#mBody");
+  const nLocal = Object.keys(LOCAL.stocks).length + Object.keys(LOCAL.settings).length;
+  $("#mLocal").innerHTML = nLocal ? `這台裝置有本機修改（${Object.keys(LOCAL.stocks).length} 檔股票${Object.keys(LOCAL.settings).length?"、全域設定":""}），只存在此瀏覽器；要讓所有裝置同步，請按「匯出設定」貼回 repo。` : "";
+  if(!mCode || !DB.stocks[mCode]){ box.innerHTML = '<div class="card pad note">沒有可選的股票。</div>'; return; }
+  try{ location.replace("#m-"+mCode); }catch(e){}
+  const est = EST.stocks[mCode] || {};
+  const s = DB.stocks[mCode], m = calc(mCode), dp = 2, cur = s.market==="US" ? "US$" : "NT$";
+  const gname = (s.groups||[]).map(g => (DB.groups||[]).find(x=>x.id===g)?.name || g).join("、");
+  const pxTxt = m.px ? `${fmt(m.px.p,dp)}` : "—";
+  const prem = m.curPE && m.base ? m.curPE / m.base[1] - 1 : null;
+
+  // ---- 1. 標的
+  let h = `<div class="card pad">
+    <div class="hero">
+      <div><div class="dname">${s.name||mCode} <span class="code">${mCode} · ${s.exchange||s.market}</span></div>
+        <div class="note">${gname}</div></div>
+      <div><div class="note">收盤價（${cur}）</div><div class="big">${pxTxt}</div>
+        <div class="note">${m.px ? m.px.d + (m.px.exact ? "" : " ⚠ 非統一日") : "無股價"}</div></div>
+      <div><div class="note">目前本益比（${BASIS[m.basis]}）</div><div class="big">${xx(m.curPE)}</div>
+        <div class="note">${prem==null ? "" : `相對基準倍數 <span class="${cls(prem)}">${pct(prem)}</span>`}</div></div>
+      <div><div class="note">機率加權目標價</div><div class="big">${m.wt==null?"—":fmt(m.wt,dp)}</div>
+        <div class="note">${m.wt&&m.px ? `相對現價 <span class="${cls(m.wt-m.px.p)}">${pct(m.wt/m.px.p-1)}</span>` : ""}</div></div>
+    </div>
+    ${m.f.note ? `<div class="note" style="margin-top:10px">📝 ${m.f.note}</div>` : ""}
+    ${(()=>{ const up = upcoming().filter(e=>e.code===mCode).slice(0,4);
+      return up.length ? `<div class="note" style="margin-top:8px">📅 ${up.map(e=>`${e.date} ${typeChip(e.type)} ${e.title}`).join("<br>📅 ")}</div>` : ""; })()}
+  </div>`;
+
+  // ---- 2. EPS + 3. 評分
+  h += `<div class="grid2" style="margin-bottom:12px">
+    <div class="card pad"><h3>EPS 與估值基礎 <small>${cur}</small></h3>
+      ${["ttm","fy26","fy27"].map(b => { const ei = epsInfo(mCode,b), a = ei.auto;
+        return `<div class="epsrow"><label class="note">${BASIS[b]} EPS</label>
+          <input class="in" type="number" step="0.01" data-f="eps_${b}" value="${ei.manual?ei.v:""}" placeholder="${a&&a.v!=null?a.v:"未填"}">
+          <div>${srcChip(ei.src)}${ei.manual&&a&&a.v!=null?` <button class="linkbtn" data-auto="${b}">改用自動 ${a.v}</button>`:""}</div>
+          <div class="why">${a ? (a.note||"") + (a.n?`（${a.n} 位分析師${a.end?"，年度至 "+a.end.slice(0,7):""}）`:"") + (a.asof?`（${a.asof}）`:"") : (b!=="ttm" && est.why ? "自動推估未產生："+est.why : "")}</div></div>`; }).join("")}
+      ${est.cons ? `<div class="note" style="margin-top:6px">Yahoo 分析師共識：${["fy26","fy27"].filter(k=>est.cons[k]).map(k=>`${BASIS[k]} ${est.cons[k].v}${est.cons[k].n?`（${est.cons[k].n} 位）`:""} <button class="linkbtn" data-cons="${k}">套用</button>`).join("　")}</div>` : ""}
+      ${est.rev ? `<div class="note" style="margin-top:4px">推估依據：近四季營收（至 ${est.rev.ttm_end}）${fmt(est.rev.rev_ttm/1e5,1)} 億、今年營收推估 ${fmt(est.rev.rev_year_est/1e5,1)} 億（${pct(est.rev.g_year)}），每 1 億營收約 ${fmt(est.rev.eps_per_rev*1e5,3)} 元 EPS</div>` : ""}
+      <div class="kv" style="margin-top:8px">
+        <label>估值用</label><select class="in" data-f="basis">${Object.entries(BASIS).map(([k,v])=>`<option value="${k}" ${k===m.basis?"selected":""}>${v} EPS</option>`).join("")}</select>
+      </div>
+      <div class="note" style="margin-top:8px">灰字＝每日自動值；輸入數字＝手動覆蓋。同業本益比會用同一種 EPS 計算。${EST.updated?`自動 EPS 更新：${EST.updated}`:"（尚無自動 EPS 資料）"}</div>
+      ${m.eps==null ? `<div class="warn" style="margin-top:6px">⚠ 請填「${BASIS[m.basis]} EPS」才能算目標價。</div>` : ""}
+    </div>
+    <div class="card pad"><h3>信評式評分調整 <small>−2 明顯較差 ～ +2 明顯較好</small></h3>
+      <table class="mt"><thead><tr><th>因子</th><th>權重</th><th>評分</th></tr></thead><tbody>
+      ${m.st.factors.map(([n,w],i) => `<tr><td>${n}</td>
+        <td><input class="in sm" type="number" step="5" data-w="${i}" value="${Math.round(w*100)}">%</td>
+        <td><select class="in sm" data-score="${i}">${[-2,-1.5,-1,-0.5,0,0.5,1,1.5,2].map(v=>`<option ${v===m.scores[i]?"selected":""}>${v}</option>`).join("")}</select></td></tr>`).join("")}
+      </tbody></table>
+      <div class="kv" style="margin-top:10px">
+        <label>加權分數</label><div class="num">${fmt(m.wsum,2)}</div>
+        <label>每 1 分調整</label><div><input class="in sm" type="number" step="1" data-set="adjPerPoint" value="${Math.round(m.st.adjPerPoint*100)}">%（全域）</div>
+        <label>倍數調整係數</label><div class="num ${cls(m.adj-1)}">× ${fmt(m.adj,3)}</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ---- 4. 同業
+  const wsumW = m.st.factors.reduce((a,[n,w])=>a+(+w),0);
+  h += `<div class="card pad"><h3>同業本益比（${BASIS[m.basis]} EPS） <small>勾選＝納入統計；本益比 > <input class="in sm" type="number" data-set="peCap" value="${m.st.peCap}" style="max-width:60px">x 或虧損預設排除</small></h3>
+    ${m.peers.length ? `<div style="overflow-x:auto"><table class="mt"><thead><tr><th>納入</th><th>同業</th><th>收盤</th><th>${BASIS[m.basis]} EPS</th><th>本益比</th></tr></thead><tbody>
+    ${m.peers.map(p => `<tr class="${p.inc?"":"off"}"><td style="text-align:left"><input type="checkbox" data-pick="${p.c}" ${p.inc?"checked":""} ${p.pe==null?"disabled":""}></td>
+      <td><span class="code">${p.c}</span>${p.name||""}${p.forced?' <span class="pill">手動</span>':""}</td>
+      <td class="num">${p.px?fmt(p.px.p,dp):"—"}${p.px&&!p.px.exact?' <span class="stale">⚠</span>':""}</td>
+      <td>${(()=>{const ei=epsInfo(p.c,m.basis);return `<input class="in sm" type="number" step="0.01" data-peps="${p.c}" value="${ei.manual?ei.v:""}" placeholder="${ei.auto&&ei.auto.v!=null?ei.auto.v:"未填"}">${srcChip(ei.src)}`})()}</td>
+      <td class="num">${xx(p.pe)}</td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="note">這檔所屬報告沒有同市場的同業。</div>`}
+    ${m.stats ? `<div class="stats">${[["家數",m.stats.n],["最低",xx(m.stats.min)],["Q1",xx(m.stats.q1)],["中位數",xx(m.stats.med)],["平均",xx(m.stats.mean)],["Q3",xx(m.stats.q3)],["最高",xx(m.stats.max)]]
+      .map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div>`
+      : `<div class="warn" style="margin-top:8px">⚠ 有效同業本益比不足 2 檔（補上同業 EPS 即可自動計算），目前${m.manual?"改用下方手動本益比":"無法計算"}。</div>`}
+    <div class="kv" style="margin-top:12px">
+      <label>手動本益比</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${["保守","基準","樂觀"].map((t,i)=>`<span class="note">${t}</span><input class="in sm" type="number" step="0.1" data-mpe="${i}" value="${m.f.manualPE?.[i]??""}">`).join("")}</div>
+      <label>倍數來源</label>
+      <div><label style="color:var(--ink)"><input type="checkbox" data-f="useManual" ${m.f.useManual?"checked":""}> 即使同業足夠也用手動本益比</label>
+        <span class="pill">目前：${m.src==="peers"?"同業 Q1／中位數／Q3":m.src==="manual"?"手動":"無"}</span></div>
+    </div>
+  </div>`;
+
+  // ---- 5. 三情境
+  const names = ["保守","基準","樂觀"];
+  h += `<div class="card pad"><h3>三情境目標價 <small>倍數 × 調整係數 × ${BASIS[m.basis]} EPS</small></h3>
+    ${m.tgt ? `<div class="scen">${names.map((n,i)=>`<div class="box">
+        <div class="lab">${n}　機率 <input class="in sm" type="number" step="5" data-prob="${i}" value="${Math.round(m.probs[i]*100)}" style="max-width:56px">%</div>
+        <div class="tp">${fmt(m.tgt[i],dp)}</div>
+        <div class="sub">${xx(m.base[i])} × ${fmt(m.adj,3)} = ${xx(m.pe3[i])}</div>
+        <div class="sub ${cls(m.px?m.tgt[i]-m.px.p:null)}">${m.px?pct(m.tgt[i]/m.px.p-1)+" vs 現價":""}</div></div>`).join("")}</div>
+      <div class="wt"><span>機率加權目標價${Math.abs(m.psum-1)>0.001?`（機率合計 ${fmt(m.psum*100,0)}%，已按比例換算）`:""}</span>
+        <b class="num">${fmt(m.wt,dp)} <span class="${cls(m.px?m.wt-m.px.p:null)}">${m.px?"（"+pct(m.wt/m.px.p-1)+"）":""}</span></b></div>`
+      : `<div class="warn">⚠ ${m.eps==null?`缺「${BASIS[m.basis]} EPS」`:""}${m.eps==null&&!m.base?"，且":""}${!m.base?"缺倍數（同業不足且沒有手動本益比）":""}，暫時無法計算。</div>`}
+  </div>`;
+
+  // ---- 6. 敏感度
+  if(m.pe3 && m.eps>0){
+    const mult = [0.8,0.9,1,1.1,1.2];
+    const cols = m.stats ? [m.stats.min*m.adj, ...m.pe3, m.stats.max*m.adj] : m.pe3;
+    const cn = m.stats ? ["最低","保守","基準","樂觀","最高"] : ["保守","基準","樂觀"];
+    h += `<div class="card pad"><h3>敏感度：EPS × 本益比 <small>紅＝高於現價，綠＝低於現價</small></h3><div style="overflow-x:auto"><table class="mt sens">
+      <thead><tr><th>EPS ＼ 本益比</th>${cols.map((c,i)=>`<th>${cn[i]}<br>${xx(c)}</th>`).join("")}</tr></thead><tbody>
+      ${mult.map(k=>`<tr><td class="num ${k===1?"hi":""}">${fmt(m.eps*k,2)}<span class="stale">${k===1?"":(k>1?"+":"")+Math.round((k-1)*100)+"%"}</span></td>
+        ${cols.map((c,i)=>{const v=m.eps*k*c; return `<td class="num ${m.px?cls(v-m.px.p):""} ${k===1&&cn[i]==="基準"?"hi":""}">${fmt(v,dp)}</td>`}).join("")}</tr>`).join("")}
+      </tbody></table></div></div>`;
+  }
+  h += `<div class="note" style="margin-bottom:8px">${Math.abs(wsumW-1)>0.001?`⚠ 因子權重合計 ${fmt(wsumW*100,0)}%（建議 100%）。`:""}
+    股價會隨每日更新自動帶入；EPS、評分與倍數都是假設輸入，修改後存在這台裝置。研究用途，不構成投資建議。</div>`;
+  box.innerHTML = h;
+
+  // ---- 事件
+  box.querySelectorAll("[data-f]").forEach(el => el.onchange = () => {
+    const k = el.dataset.f, v = el.type==="checkbox" ? el.checked : el.tagName==="SELECT" ? el.value : numOrNull(el.value);
+    setF(mCode, k, v); renderModel(); });
+  box.querySelectorAll("[data-auto]").forEach(el => el.onclick = () => { setF(mCode, "eps_"+el.dataset.auto, null); renderModel(); });
+  box.querySelectorAll("[data-cons]").forEach(el => el.onclick = () => { setF(mCode, "eps_"+el.dataset.cons, est.cons[el.dataset.cons].v); renderModel(); });
+  box.querySelectorAll("[data-peps]").forEach(el => el.onchange = () => { setF(el.dataset.peps, "eps_"+m.basis, numOrNull(el.value)); renderModel(); });
+  box.querySelectorAll("[data-pick]").forEach(el => el.onchange = () => {
+    const pk = {...(m.f.pick||{})}, c = el.dataset.pick, p = m.peers.find(x=>x.c===c);
+    if(el.checked === p.auto) delete pk[c]; else pk[c] = el.checked;
+    setF(mCode, "pick", pk); renderModel(); });
+  box.querySelectorAll("[data-score]").forEach(el => el.onchange = () => {
+    const sc = m.scores.slice(); sc[+el.dataset.score] = +el.value; setF(mCode, "scores", sc); renderModel(); });
+  box.querySelectorAll("[data-mpe]").forEach(el => el.onchange = () => {
+    const mp = (m.f.manualPE||[null,null,null]).slice(); mp[+el.dataset.mpe] = numOrNull(el.value); setF(mCode, "manualPE", mp); renderModel(); });
+  box.querySelectorAll("[data-prob]").forEach(el => el.onchange = () => {
+    const pr = m.probs.slice(); pr[+el.dataset.prob] = (numOrNull(el.value)||0)/100; setF(mCode, "probs", pr); renderModel(); });
+  box.querySelectorAll("[data-w]").forEach(el => el.onchange = () => {
+    const fs = m.st.factors.map(x=>x.slice()); fs[+el.dataset.w][1] = (numOrNull(el.value)||0)/100; setS("factors", fs); renderModel(); });
+  box.querySelectorAll("[data-set]").forEach(el => el.onchange = () => {
+    const k = el.dataset.set, v = numOrNull(el.value); if(v==null) return;
+    setS(k, k==="adjPerPoint" ? v/100 : v); renderModel(); });
+}
+
+function exportJson(){
+  const out = {"_說明": FUND["_說明"] || "估值模型輸入", settings: SET(), stocks: {}};
+  const codes = new Set([...Object.keys(FUND.stocks), ...Object.keys(LOCAL.stocks)]);
+  codes.forEach(c => { const v = FS(c); Object.keys(v).forEach(k => (v[k]==null) && delete v[k]); out.stocks[c] = v; });
+  $("#mJson").value = JSON.stringify(out, null, 2);
+  $("#modal").style.display = "flex";
+}
+let resetArmed = false;
+function resetLocal(){
+  const b = $("#mReset");
+  if(!resetArmed){ resetArmed = true; b.textContent = "再按一次確認清除"; setTimeout(()=>{resetArmed=false; b.textContent="清除本機修改";}, 3000); return; }
+  LOCAL = {settings:{}, stocks:{}}; saveLocal(); resetArmed = false; b.textContent = "清除本機修改"; renderModel(); toast("已清除，回到 fundamentals.json 的設定");
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => switchView(b.dataset.v));
+$("#mStock").onchange = e => { mCode = e.target.value; renderModel(); };
+$("#toModel").onclick = () => selected && openModel(selected);
+$("#mExport").onclick = exportJson;
+$("#mReset").onclick = resetLocal;
+$("#mClose").onclick = () => $("#modal").style.display = "none";
+$("#mCopyJson").onclick = async () => { try{ await navigator.clipboard.writeText($("#mJson").value); toast("已複製"); }catch(e){ $("#mJson").select(); toast("請手動全選複製"); } };
+
+
+/* =================== 月報 =================== */
+const todayISO = () => { const d = new Date(Date.now() + 8*3600e3); return d.toISOString().slice(0,10); };
+const WD = "日一二三四五六";
+const typeChip = t => `<span class="chip t-${t}">${t}</span>`;
+const inGroup = c => { const s = DB.stocks[c]; return s && !s.hidden && (group==="ALL" || (s.groups||[]).includes(group)); };
+const EVENT_TYPES = ["法說會","股東會","股利","財報","董事會","庫藏股"];
+const upcoming = () => (EVENTS.events||[]).filter(e => (e.date||"") >= todayISO() &&
+  (EVENT_TYPES.includes(e.type) || (e.announced && e.date > e.announced))).sort((a,b)=>a.date.localeCompare(b.date));
+const ymAdd = (ym,k) => { let [y,m] = ym.split("-").map(Number); m += k; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return `${y}-${String(m).padStart(2,"0")}`; };
+
+function revenueRows(){
+  const codes = Object.keys(DB.stocks).filter(c => inGroup(c) && DB.stocks[c].market==="TW" && REV[c]);
+  let last = ""; codes.forEach(c => Object.keys(REV[c]).forEach(k => { if(/^\d{4}-\d{2}$/.test(k) && k > last) last = k; }));
+  if(!last) return {last:null, rows:[]};
+  const rows = codes.map(c => {
+    const r = REV[c], cur = r[last], prev = r[ymAdd(last,-1)], ly = r[ymAdd(last,-12)];
+    const y = last.slice(0,4), mm = +last.slice(5);
+    let ytd = 0, ytdL = 0, ok = true;
+    for(let i=1;i<=mm;i++){ const a = r[`${y}-${String(i).padStart(2,"0")}`], b = r[`${+y-1}-${String(i).padStart(2,"0")}`]; if(a==null||b==null){ok=false;break;} ytd+=a; ytdL+=b; }
+    return {c, name:DB.stocks[c].name, cur, mom: cur!=null&&prev ? cur/prev-1 : null, yoy: cur!=null&&ly ? cur/ly-1 : null, ytd: ok&&ytdL ? ytd/ytdL-1 : null};
+  }).sort((a,b)=>(DB.stocks[a.c].order??999)-(DB.stocks[b.c].order??999));
+  return {last, rows};
+}
+
+function evRow(e, showSoon){
+  const d = new Date(e.date+"T00:00:00+08:00"), days = Math.round((d - new Date(todayISO()+"T00:00:00+08:00"))/864e5);
+  return `<tr><td class="dd">${e.date.slice(5)}（${WD[d.getDay()]}）${showSoon?`<span class="soon">${days===0?"今天":days+" 天後"}</span>`:""}</td>
+    <td><span class="code">${e.code}</span>${e.name||DB.stocks[e.code]?.name||""}</td>
+    <td>${typeChip(e.type)} ${e.title||""}${e.detail?`<div class="det">${e.detail}</div>`:""}</td></tr>`;
+}
+
+function renderReport(){
+  const box = $("#rBody"), today = todayISO();
+  const up = upcoming().filter(e => inGroup(e.code));
+  const past = (EVENTS.events||[]).filter(e => inGroup(e.code) && (e.src||"").includes("重大訊息") && (e.announced||e.date||"") <= today)
+    .sort((a,b)=>(b.announced||b.date||"").localeCompare(a.announced||a.date||"")).slice(0,40);
+  const rv = revenueRows();
+  const hi = rv.rows.filter(r => r.yoy!=null && (r.yoy>0.3 || r.yoy<-0.2));
+  const pctc = x => x==null ? "—" : `<span class="${cls(x)}">${sign(x)}${fmt(x*100,1)}%</span>`;
+  let h = `<div class="card pad"><h3>本月重點 <small>${EVENTS.updated?`活動更新 ${EVENTS.updated}`:"尚無活動資料"}</small></h3><div class="note" style="color:var(--ink);line-height:1.8">
+    📅 未來 30 天有 <b>${up.filter(e=>e.date<=ymd(30)).length}</b> 項活動，其中法說會 <b>${up.filter(e=>e.type==="法說會"&&e.date<=ymd(30)).length}</b> 場${up[0]?`；最近一項：${up[0].date.slice(5)} ${up[0].name||up[0].code} ${up[0].type}`:""}<br>
+    📈 ${rv.last?`${rv.last} 月營收：年增率最高 ${topYoy(rv.rows,1)}、最低 ${topYoy(rv.rows,-1)}${hi.length?`；年增 >30% 或 <−20%：${hi.map(r=>r.name).join("、")}`:""}`:"尚無月營收資料"}
+  </div></div>`;
+
+  h += `<div class="card pad"><h3>📅 即將舉行 <small>法說會、股東會、除權息、財報日…</small></h3>
+    ${up.length ? `<div style="overflow-x:auto"><table class="mt ev"><tbody>${up.map(e=>evRow(e,true)).join("")}</tbody></table></div>` : `<div class="note">目前沒有已公告的未來活動。</div>`}</div>`;
+
+  h += `<div class="card pad"><h3>📈 月營收 ${rv.last?`<small>${rv.last.replace("-"," 年 ")} 月（單位：億元）</small>`:""}</h3>
+    ${rv.rows.length ? `<div style="overflow-x:auto"><table class="mt"><thead><tr><th>公司</th><th>當月營收</th><th>月增率</th><th>年增率</th><th class="hide-sm">累計年增</th></tr></thead><tbody>
+    ${rv.rows.map(r=>`<tr><td style="text-align:left"><span class="code">${r.c}</span>${r.name||""}</td><td class="num">${r.cur==null?"—":fmt(r.cur/1e5,2)}</td>
+      <td class="num">${pctc(r.mom)}</td><td class="num">${pctc(r.yoy)}</td><td class="num hide-sm">${pctc(r.ytd)}</td></tr>`).join("")}
+    </tbody></table></div><div class="note" style="margin-top:6px">資料：證交所／櫃買中心月營收，每月 11 日更新。點公司可到估值模型看對 EPS 推估的影響。</div>`
+    : `<div class="note">這個分頁沒有台股，或尚未抓到月營收。</div>`}</div>`;
+
+  h += `<div class="card pad"><h3>📰 近期重大訊息 <small>最近 ${past.length} 則</small></h3>
+    ${past.length ? `<div style="overflow-x:auto"><table class="mt ev"><tbody>${past.map(e=>evRow({...e, date:e.announced||e.date},false)).join("")}</tbody></table></div>` : `<div class="note">尚無資料（重大訊息每天收集，部署後會逐日累積）。</div>`}</div>
+    <div class="note">台股活動來自證交所／櫃買中心重大訊息與除權息預告；美股財報日來自 Yahoo（可能是預估區間）。日期以公司公告為準。</div>`;
+  box.innerHTML = h;
+  box.querySelectorAll("tbody tr").forEach(tr => { const c = tr.querySelector(".code")?.textContent; if(c && DB.stocks[c]){ tr.style.cursor="pointer"; tr.onclick = () => openModel(c); } });
+}
+function ymd(n){ const d = new Date(Date.now() + 8*3600e3 + n*864e5); return d.toISOString().slice(0,10); }
+function topYoy(rows, dir){ const r = rows.filter(x=>x.yoy!=null).sort((a,b)=>dir*(b.yoy-a.yoy))[0]; return r ? `${r.name}（${sign(r.yoy)}${fmt(r.yoy*100,1)}%）` : "—"; }
+
+/* ---------- 事件 ---------- */
+$("#date").onchange = () => { render(); if(view==="model") renderModel(); };
+$("#csv").onclick = downloadCSV;
+$("#copy").onclick = copyPrices;
+document.querySelectorAll("#range button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#range button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  range = +b.dataset.r; renderDetail();
+});
+document.querySelectorAll("thead th[data-k]").forEach(th => th.onclick = () => {
+  const k = th.dataset.k; sortDir = sortKey===k ? -sortDir : (k==="name"?1:-1); sortKey = k; render();
+});
+addEventListener("resize", () => selected && renderDetail());
+load();
+</script>
+</body>
+</html>
