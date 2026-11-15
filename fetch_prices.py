@@ -260,6 +260,8 @@ def main():
         st["order"] = watch.index(s)
         if s.get("name"):
             st["name"] = s["name"]
+        # 新加入的股票（歷史不到 20 天）自動回補一年
+        srng = rng or ("1y" if len(st.get("history", [])) < 20 else None)
         try:
             if market == "TW":
                 row = twse.get(code) or tpex.get(code)
@@ -268,10 +270,10 @@ def main():
                     st.setdefault("name", row.get("name"))
                 suffixes = [".TW"] if st.get("exchange") == "TWSE" else \
                            [".TWO"] if st.get("exchange") == "TPEx" else [".TW", ".TWO"]
-                if rng or not row:  # 回補，或官方抓不到時改用 Yahoo
+                if srng or not row:  # 回補，或官方抓不到時改用 Yahoo
                     for suf in suffixes:
                         try:
-                            merge(st, fetch_yahoo(code + suf, rng or "5d"))
+                            merge(st, fetch_yahoo(code + suf, srng or "5d"))
                             st.setdefault("exchange", "TWSE" if suf == ".TW" else "TPEx")
                             break
                         except Exception:  # noqa: BLE001
@@ -280,7 +282,7 @@ def main():
                     merge(st, [row])
             else:
                 st["exchange"] = "US"
-                merge(st, fetch_yahoo(code, rng or "5d"))
+                merge(st, fetch_yahoo(code, srng or "5d"))
             last = st["history"][-1] if st["history"] else None
             print(f"✓ {code:<6} {st.get('name','')}  {last['d'] if last else '-'}  {last['c'] if last else '-'}")
         except Exception as e:  # noqa: BLE001
