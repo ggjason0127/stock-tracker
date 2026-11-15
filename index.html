@@ -533,7 +533,7 @@ function renderModel(){
         <div class="note">${m.px ? m.px.d + (m.px.exact ? "" : " ⚠ 非統一日") : "無股價"}</div></div>
       <div><div class="note">目前本益比（${BASIS[m.basis]}）</div><div class="big">${xx(m.curPE)}</div>
         <div class="note">${prem==null ? "" : `相對基準倍數 <span class="${cls(prem)}">${pct(prem)}</span>`}</div></div>
-      <div><div class="note">機率加權目標價</div><div class="big">${m.wt==null?"—":fmt(m.wt,dp)}</div>
+      <div><div class="note">機率加權推估價</div><div class="big">${m.wt==null?"—":fmt(m.wt,dp)}</div>
         <div class="note">${m.wt&&m.px ? `相對現價 <span class="${cls(m.wt-m.px.p)}">${pct(m.wt/m.px.p-1)}</span>` : ""}</div></div>
     </div>
     ${m.f.note ? `<div class="note" style="margin-top:10px">📝 ${m.f.note}</div>` : ""}
@@ -573,7 +573,7 @@ function renderModel(){
 
   // ---- 4. 同業
   const wsumW = m.st.factors.reduce((a,[n,w])=>a+(+w),0);
-  h += `<div class="card pad"><h3>同業本益比（${BASIS[m.basis]} EPS） <small>勾選＝納入統計；本益比 > <input class="in sm" type="number" data-set="peCap" value="${m.st.peCap}" style="max-width:60px">x 或虧損預設排除</small></h3>
+  h += `<div class="card pad"><h3>${s.name||mCode} 的同業本益比（${BASIS[m.basis]} EPS，不含 ${s.name||mCode} 本身） <small>勾選＝納入統計；本益比 > <input class="in sm" type="number" data-set="peCap" value="${m.st.peCap}" style="max-width:60px">x 或虧損預設排除</small></h3>
     ${m.peers.length ? `<div style="overflow-x:auto"><table class="mt"><thead><tr><th>納入</th><th>同業</th><th>收盤</th><th>${BASIS[m.basis]} EPS</th><th>本益比</th></tr></thead><tbody>
     ${m.peers.map(p => `<tr class="${p.inc?"":"off"}"><td style="text-align:left"><input type="checkbox" data-pick="${p.c}" ${p.inc?"checked":""} ${p.pe==null?"disabled":""}></td>
       <td><span class="code">${p.c}</span>${p.name||""}${p.forced?' <span class="pill">手動</span>':""}</td>
@@ -595,13 +595,13 @@ function renderModel(){
 
   // ---- 5. 三情境
   const names = ["保守","基準","樂觀"];
-  h += `<div class="card pad"><h3>三情境目標價 <small>倍數 × 調整係數 × ${BASIS[m.basis]} EPS</small></h3>
+  h += `<div class="card pad"><h3>${s.name||mCode}（${mCode}）三情境推估價 <small>同業倍數 × 調整係數 × ${s.name||mCode} 的${BASIS[m.basis]} EPS ${m.eps!=null?fmt(m.eps,2):""}</small></h3>
     ${m.tgt ? `<div class="scen">${names.map((n,i)=>`<div class="box">
         <div class="lab">${n}　機率 <input class="in sm" type="number" step="5" data-prob="${i}" value="${Math.round(m.probs[i]*100)}" style="max-width:56px">%</div>
         <div class="tp">${fmt(m.tgt[i],dp)}</div>
         <div class="sub">${xx(m.base[i])} × ${fmt(m.adj,3)} = ${xx(m.pe3[i])}</div>
         <div class="sub ${cls(m.px?m.tgt[i]-m.px.p:null)}">${m.px?pct(m.tgt[i]/m.px.p-1)+" vs 現價":""}</div></div>`).join("")}</div>
-      <div class="wt"><span>機率加權目標價${Math.abs(m.psum-1)>0.001?`（機率合計 ${fmt(m.psum*100,0)}%，已按比例換算）`:""}</span>
+      <div class="wt"><span>${s.name||mCode} 機率加權推估價${Math.abs(m.psum-1)>0.001?`（機率合計 ${fmt(m.psum*100,0)}%，已按比例換算）`:""}</span>
         <b class="num">${fmt(m.wt,dp)} <span class="${cls(m.px?m.wt-m.px.p:null)}">${m.px?"（"+pct(m.wt/m.px.p-1)+"）":""}</span></b></div>`
       : `<div class="warn">⚠ ${m.eps==null?`缺「${BASIS[m.basis]} EPS」`:""}${m.eps==null&&!m.base?"，且":""}${!m.base?"缺倍數（同業不足且沒有手動本益比）":""}，暫時無法計算。</div>`}
   </div>`;
@@ -611,7 +611,7 @@ function renderModel(){
     const mult = [0.8,0.9,1,1.1,1.2];
     const cols = m.stats ? [m.stats.min*m.adj, ...m.pe3, m.stats.max*m.adj] : m.pe3;
     const cn = m.stats ? ["最低","保守","基準","樂觀","最高"] : ["保守","基準","樂觀"];
-    h += `<div class="card pad"><h3>敏感度：EPS × 本益比 <small>紅＝高於現價，綠＝低於現價</small></h3><div style="overflow-x:auto"><table class="mt sens">
+    h += `<div class="card pad"><h3>${s.name||mCode} 敏感度：EPS × 本益比 <small>紅＝高於現價，綠＝低於現價</small></h3><div style="overflow-x:auto"><table class="mt sens">
       <thead><tr><th>EPS ＼ 本益比</th>${cols.map((c,i)=>`<th>${cn[i]}<br>${xx(c)}</th>`).join("")}</tr></thead><tbody>
       ${mult.map(k=>`<tr><td class="num ${k===1?"hi":""}">${fmt(m.eps*k,2)}<span class="stale">${k===1?"":(k>1?"+":"")+Math.round((k-1)*100)+"%"}</span></td>
         ${cols.map((c,i)=>{const v=m.eps*k*c; return `<td class="num ${m.px?cls(v-m.px.p):""} ${k===1&&cn[i]==="基準"?"hi":""}">${fmt(v,dp)}</td>`}).join("")}</tr>`).join("")}
