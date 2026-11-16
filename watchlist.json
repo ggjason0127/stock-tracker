@@ -23,6 +23,10 @@
     {
       "id": "pcbmat",
       "name": "PCB 上游材料"
+    },
+    {
+      "id": "pcbequip",
+      "name": "PCB 設備與化學品"
     }
   ],
   "stocks": [
@@ -456,6 +460,78 @@
       "market": "TW",
       "groups": [
         "pcbmat"
+      ]
+    },
+    {
+      "code": "2355",
+      "name": "敬鵬",
+      "market": "TW",
+      "groups": [
+        "pcb"
+      ]
+    },
+    {
+      "code": "6108",
+      "name": "競國",
+      "market": "TW",
+      "groups": [
+        "pcb"
+      ]
+    },
+    {
+      "code": "8039",
+      "name": "台虹",
+      "market": "TW",
+      "groups": [
+        "pcbmat"
+      ]
+    },
+    {
+      "code": "4939",
+      "name": "亞電",
+      "market": "TW",
+      "groups": [
+        "pcbmat"
+      ]
+    },
+    {
+      "code": "2467",
+      "name": "志聖",
+      "market": "TW",
+      "groups": [
+        "pcbequip"
+      ]
+    },
+    {
+      "code": "3563",
+      "name": "牧德",
+      "market": "TW",
+      "groups": [
+        "pcbequip"
+      ]
+    },
+    {
+      "code": "6438",
+      "name": "迅得",
+      "market": "TW",
+      "groups": [
+        "pcbequip"
+      ]
+    },
+    {
+      "code": "3485",
+      "name": "敘豐",
+      "market": "TW",
+      "groups": [
+        "pcbequip"
+      ]
+    },
+    {
+      "code": "2493",
+      "name": "揚博",
+      "market": "TW",
+      "groups": [
+        "pcbequip"
       ]
     }
   ]
