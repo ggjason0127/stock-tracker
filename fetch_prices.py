@@ -141,7 +141,7 @@ def fetch_yahoo(sym, rng="5d"):
             "h": _r(q.get("high", [None])[i]),
             "l": _r(q.get("low", [None])[i]),
             "c": _r(c),
-            "chg": _r(c - prev) if prev is not None else None,
+            "chg": None,  # 合併後用前一日收盤（可能是官方價）重新計算
             "v": q.get("volume", [None])[i],
         })
         prev = c
@@ -161,11 +161,12 @@ def merge(stock, bars):
         clean = {k: b.get(k) for k in ("d", "o", "h", "l", "c", "chg", "v")}
         hist[b["d"]] = clean
     stock["history"] = [hist[d] for d in sorted(hist)]
-    # 沒有官方漲跌時，用前一日收盤補算
+    # 沒有官方漲跌時，用前一日收盤補算（cc=1 表示自行計算，每次合併後重算）
     h = stock["history"]
     for i in range(1, len(h)):
-        if h[i].get("chg") is None and h[i - 1].get("c") is not None:
+        if (h[i].get("chg") is None or h[i].get("cc")) and h[i - 1].get("c") is not None:
             h[i]["chg"] = round(h[i]["c"] - h[i - 1]["c"], 4)
+            h[i]["cc"] = 1
 
 
 # ---------- 給 Excel 模型用的 CSV ----------
@@ -270,7 +271,8 @@ def main():
                     st.setdefault("name", row.get("name"))
                 suffixes = [".TW"] if st.get("exchange") == "TWSE" else \
                            [".TWO"] if st.get("exchange") == "TPEx" else [".TW", ".TWO"]
-                if srng or not row:  # 回補，或官方抓不到時改用 Yahoo
+                # 每次都用 Yahoo 抓近 5 日補齊（官方盤後資料有時下午仍是前一交易日），同日以官方為準
+                if True:
                     for suf in suffixes:
                         try:
                             merge(st, fetch_yahoo(code + suf, srng or "5d"))

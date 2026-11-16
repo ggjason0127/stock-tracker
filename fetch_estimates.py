@@ -165,8 +165,9 @@ def parse_mops_month(raw):
     return out
 
 
-def backfill_revenue(store, codes, today):
-    """用公開資訊觀測站月營收彙總頁回補最近 N 個月（每月只試一次，失敗 7 天後再試）"""
+def backfill_revenue(store, codes, today, force=False):
+    """用公開資訊觀測站月營收彙總頁回補最近 N 個月。
+    codes：要補的股票；force=True 時忽略「7 天內試過」的紀錄（新加入的股票用）"""
     meta = store.setdefault("_tried", {})
     last_pub = ym_add(f"{today.year:04d}-{today.month:02d}", -1)
     for k in range(BACKFILL_MONTHS):
@@ -175,7 +176,7 @@ def backfill_revenue(store, codes, today):
         if have >= len(codes):
             continue
         tried = meta.get(ym)
-        if tried and (today - dt.date.fromisoformat(tried)).days < 7:
+        if not force and tried and (today - dt.date.fromisoformat(tried)).days < 7:
             continue
         y, m = map(int, ym.split("-"))
         got = {}
@@ -294,14 +295,25 @@ def main():
 
     # 台股
     pe = fetch_pe() if tw else {}
-    need_rev = args.revenue or any(c not in revs.get("_codes", []) for c in tw)  # 第一次或新加股票時也抓
+    # 月營收不足 24 個月的股票（新加入）也要抓，每檔每 7 天最多試一次
+    bf = revs.setdefault("_bf", {})
+    months = lambda c: sum(1 for k in revs.get(c, {}) if re.fullmatch(r"\d{4}-\d{2}", k))
+    lacking = [c for c in tw if months(c) < 24 and
+               (c not in bf or (today - dt.date.fromisoformat(bf[c])).days >= 7)]
+    need_rev = args.revenue or bool(lacking)
     if tw and need_rev:
         print("抓月營收…")
         for c, d in fetch_rev_snapshot().items():
             if c in tw:
                 revs.setdefault(c, {}).update(d)
-        backfill_revenue(revs, tw, today)
-        revs["_codes"] = sorted(set(revs.get("_codes", [])) | set(tw))
+        if args.revenue:
+            backfill_revenue(revs, tw, today)
+        if lacking:
+            print(f"  新股票回補月營收：{', '.join(lacking)}")
+            backfill_revenue(revs, lacking, today, force=True)
+            for c in lacking:
+                bf[c] = today.isoformat()
+        revs.pop("_codes", None)
 
     yahoo = Yahoo()
     try:
