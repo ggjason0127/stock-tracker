@@ -311,6 +311,118 @@
       ]
     },
     {
+      "code": "AKAM",
+      "name": "Akamai",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "NET",
+      "name": "Cloudflare",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "RBRK",
+      "name": "Rubrik",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "DDOG",
+      "name": "Datadog",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "CSCO",
+      "name": "Cisco",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "FFIV",
+      "name": "F5",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "ATEN",
+      "name": "A10 Networks",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "RPD",
+      "name": "Rapid7",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "VRNS",
+      "name": "Varonis",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "YOU",
+      "name": "Clear Secure",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "INFY",
+      "name": "Infosys",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "LDOS",
+      "name": "Leidos",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "BAH",
+      "name": "Booz Allen Hamilton",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
+      "code": "PSN",
+      "name": "Parsons",
+      "market": "US",
+      "groups": [
+        "cyber"
+      ]
+    },
+    {
       "code": "3653",
       "name": "健策",
       "market": "TW",
