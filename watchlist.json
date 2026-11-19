@@ -27,6 +27,10 @@
     {
       "id": "pcbequip",
       "name": "PCB 設備與化學品"
+    },
+    {
+      "id": "core",
+      "name": "權值股"
     }
   ],
   "stocks": [
@@ -645,6 +649,26 @@
       "groups": [
         "pcbequip"
       ]
+    },
+    {
+      "code": "2330",
+      "name": "台積電",
+      "market": "TW",
+      "groups": [
+        "core"
+      ]
+    },
+    {
+      "code": "^TWII",
+      "name": "加權指數",
+      "market": "IDX",
+      "groups": []
+    },
+    {
+      "code": "^GSPC",
+      "name": "S&P 500",
+      "market": "IDX",
+      "groups": []
     }
   ]
 }

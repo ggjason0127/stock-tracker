@@ -136,7 +136,7 @@
     </div>
   </header>
   <div id="banner"></div>
-  <nav class="tabs"><button data-v="prices" class="on">股價</button><button data-v="model">估值模型</button><button data-v="report">月報</button></nav>
+  <nav class="tabs"><button data-v="prices" class="on">股價</button><button data-v="model">估值模型</button><button data-v="report">月報</button><button data-v="beta">組合 Beta</button></nav>
 
   <section id="vPrices">
   <div class="card">
@@ -181,6 +181,7 @@
   </section>
 
   <section id="vReport" style="display:none"><div id="rBody"></div></section>
+  <section id="vBeta" style="display:none"><div id="bBody"></div></section>
 
   <div class="modal" id="modal"><div class="box">
     <b>匯出估值設定</b>
@@ -225,7 +226,7 @@ async function load(){
 
 function stocks(){
   return Object.entries(DB.stocks)
-    .filter(([c,s]) => !s.hidden && s.history && s.history.length)
+    .filter(([c,s]) => !s.hidden && s.history && s.history.length && s.market !== "IDX")
     .filter(([c,s]) => group === "ALL" || (s.groups||[]).includes(group))
     .map(([c,s]) => ({code:c, ...s}))
     .sort((a,b) => (a.market===b.market?0:a.market==="TW"?-1:1) || (a.order??999)-(b.order??999));
@@ -342,6 +343,7 @@ function renderDetail(){
     ["區間報酬", `<span class="${cls(ret)}">${sign(ret)}${fmt(ret,2)}%</span>`],
     ["區間最高", fmt(hi,dp)], ["區間最低", fmt(lo,dp)],
     ["MA5", fmt(ma(5),dp)], ["MA20", fmt(ma(20),dp)], ["MA60", fmt(ma(60),dp)],
+    ["Beta（1 年）", (()=>{ const b = betaOf(selected); return b ? fmt(b.beta,2) : "—"; })()],
   ].map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 
   $("#hrows").innerHTML = view.slice().reverse().map(b=>`<tr>
@@ -504,9 +506,11 @@ function switchView(v){
   $("#vPrices").style.display = v==="prices" ? "" : "none";
   $("#vModel").style.display = v==="model" ? "" : "none";
   $("#vReport").style.display = v==="report" ? "" : "none";
+  $("#vBeta").style.display = v==="beta" ? "" : "none";
   $("#copy").style.display = $("#csv").style.display = v==="prices" ? "" : "none";
   if(v==="model"){ if(!mCode) buildModelSelect(); renderModel(); }
   if(v==="report") renderReport();
+  if(v==="beta") renderBeta();
 }
 
 const pct = x => x==null ? "—" : sign(x)+fmt(x*100,1)+"%";
@@ -729,6 +733,81 @@ function renderReport(){
 }
 function ymd(n){ const d = new Date(Date.now() + 8*3600e3 + n*864e5); return d.toISOString().slice(0,10); }
 function topYoy(rows, dir){ const r = rows.filter(x=>x.yoy!=null).sort((a,b)=>dir*(b.yoy-a.yoy))[0]; return r ? `${r.name}（${sign(r.yoy)}${fmt(r.yoy*100,1)}%）` : "—"; }
+
+
+/* =================== Beta =================== */
+const BENCH = m => m === "US" ? "^GSPC" : "^TWII";
+/* 用最近 n 個共同交易日的日報酬：beta = 共變異數(股票, 大盤) ÷ 變異數(大盤) */
+function betaOf(code, n = 250){
+  const s = DB.stocks[code], idx = s && DB.stocks[BENCH(s.market)];
+  if(!s || !idx || s.market === "IDX") return null;
+  const im = new Map(idx.history.map(b => [b.d, b.c]));
+  const pts = []; let prev = null;
+  for(const b of s.history){
+    const ic = im.get(b.d);
+    if(ic == null){ prev = null; continue; }
+    if(prev) pts.push([b.c / prev.c - 1, ic / prev.ic - 1]);
+    prev = {c: b.c, ic};
+  }
+  const r = pts.slice(-n); if(r.length < 60) return null;
+  const k = r.length, ms = r.reduce((a,p)=>a+p[0],0)/k, mm = r.reduce((a,p)=>a+p[1],0)/k;
+  let cov = 0, vm = 0, vs = 0;
+  r.forEach(([x,y]) => { cov += (x-ms)*(y-mm); vm += (y-mm)**2; vs += (x-ms)**2; });
+  cov /= (k-1); vm /= (k-1); vs /= (k-1);
+  return {beta: cov/vm, cov, varM: vm, corr: cov/Math.sqrt(vm*vs), n: k, bench: idx.name || BENCH(s.market),
+          from: s.history.at(-k)?.d};
+}
+
+let BROWS = null;
+function loadBRows(){
+  if(BROWS) return BROWS;
+  try{ BROWS = JSON.parse(localStorage.getItem("betaRows")||"null"); }catch(e){}
+  if(!Array.isArray(BROWS) || !BROWS.length) BROWS = [{code:"3653", v:100},{code:"4961", v:100},{code:"2330", v:100}];
+  return BROWS;
+}
+function saveBRows(){ try{ localStorage.setItem("betaRows", JSON.stringify(BROWS)); }catch(e){} }
+
+function renderBeta(){
+  const rows = loadBRows(), box = $("#bBody");
+  const opts = Object.entries(DB.stocks).filter(([c,s]) => !s.hidden && s.market !== "IDX")
+    .sort((a,b)=>(a[1].market===b[1].market?0:a[1].market==="TW"?-1:1)||a[0].localeCompare(b[0]));
+  const calc = rows.map(r => {
+    if(r.code === "CASH") return {...r, name:"現金", b:{beta:0}};
+    return {...r, name: DB.stocks[r.code]?.name || r.code, market: DB.stocks[r.code]?.market, b: betaOf(r.code)};
+  });
+  const total = calc.reduce((a,r)=>a+(+r.v||0),0);
+  calc.forEach(r => { r.w = total ? (+r.v||0)/total : 0; r.wb = r.b ? r.w * r.b.beta : null; });
+  const ok = calc.every(r => r.b);
+  const pb = calc.reduce((a,r)=>a+(r.wb||0),0);
+  const mixed = new Set(calc.filter(r=>r.market).map(r=>r.market)).size > 1;
+  const sel = (i, v) => `<select class="in" data-bc="${i}" style="max-width:190px;text-align:left"><option value="CASH" ${v==="CASH"?"selected":""}>現金</option>${opts.map(([c,s])=>`<option value="${c}" ${c===v?"selected":""}>${c} ${s.name||""}</option>`).join("")}</select>`;
+  box.innerHTML = `<div class="card pad"><h3>組合 Beta <small>依市值權重加權平均</small></h3>
+    <div class="hero"><div><div class="note">組合 Beta</div><div class="big">${ok?fmt(pb,2):"—"}</div>
+      <div class="note">${ok?`大盤漲跌 1%，組合平均約漲跌 ${fmt(Math.abs(pb),2)}%`:"部分股票資料不足，無法計算"}</div></div></div>
+    <div style="overflow-x:auto;margin-top:12px"><table class="mt"><thead><tr><th>股票</th><th>市值</th><th>權重</th><th>Beta</th><th>權重 × Beta</th><th class="hide-sm">共變異數</th><th class="hide-sm">大盤變異數</th><th class="hide-sm">相關係數</th><th></th></tr></thead><tbody>
+    ${calc.map((r,i)=>`<tr><td style="text-align:left">${sel(i, r.code)}</td>
+      <td><input class="in sm" type="number" min="0" step="1" data-bv="${i}" value="${r.v}" style="max-width:100px"></td>
+      <td class="num">${fmt(r.w*100,1)}%</td>
+      <td class="num">${r.b?fmt(r.b.beta,2):"資料不足"}</td>
+      <td class="num">${r.wb==null?"—":fmt(r.wb,3)}</td>
+      <td class="num hide-sm">${r.b&&r.b.cov!=null?(r.b.cov*1e4).toFixed(3):"—"}</td>
+      <td class="num hide-sm">${r.b&&r.b.varM!=null?(r.b.varM*1e4).toFixed(3):"—"}</td>
+      <td class="num hide-sm">${r.b&&r.b.corr!=null?fmt(r.b.corr,2):"—"}</td>
+      <td><button class="linkbtn" data-bdel="${i}">刪除</button></td></tr>`).join("")}
+    <tr><td style="text-align:left"><button data-badd="1">＋ 新增一列</button></td><td class="num">${fmt(total,0)}</td><td class="num">100%</td><td></td><td class="num"><b>${ok?fmt(pb,3):"—"}</b></td><td class="hide-sm" colspan="4"></td></tr>
+    </tbody></table></div>
+    <div class="note" style="margin-top:10px;line-height:1.7">
+      市值可填金額或任何比例（例如 100、100、100 代表三檔各 1/3）；現金 beta 為 0。設定存在這台裝置。<br>
+      個股 Beta ＝ 共變異數 ÷ 大盤變異數，用最近 1 年（約 250 個交易日）的日報酬計算；台股對照加權指數，美股對照 S&P 500。共變異數與變異數欄位為日報酬數值 × 10⁻⁴。<br>
+      ${calc.filter(r=>r.b&&r.b.n).map(r=>`${r.name}：${r.b.n} 個交易日（${r.b.from} 起），對照${r.b.bench}`).join("；")}
+      ${mixed?`<br><span class="warn">⚠ 組合同時有台股和美股，各自對照不同大盤，加總後的組合 beta 只能當近似值。</span>`:""}
+    </div></div>
+  <div class="card pad note">Beta 只衡量跟大盤連動的程度，不含個股自身消息的風險；期間或用日報酬、週報酬不同，算出的數字會不一樣。研究用途，不構成投資建議。</div>`;
+  box.querySelectorAll("[data-bc]").forEach(el => el.onchange = () => { BROWS[+el.dataset.bc].code = el.value; saveBRows(); renderBeta(); });
+  box.querySelectorAll("[data-bv]").forEach(el => el.onchange = () => { BROWS[+el.dataset.bv].v = Math.max(0, +el.value||0); saveBRows(); renderBeta(); });
+  box.querySelectorAll("[data-bdel]").forEach(el => el.onclick = () => { BROWS.splice(+el.dataset.bdel,1); saveBRows(); renderBeta(); });
+  box.querySelector("[data-badd]").onclick = () => { BROWS.push({code:"CASH", v:0}); saveBRows(); renderBeta(); };
+}
 
 /* ---------- 事件 ---------- */
 $("#date").onchange = () => { render(); if(view==="model") renderModel(); };

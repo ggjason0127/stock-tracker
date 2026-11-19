@@ -283,7 +283,7 @@ def main():
                 if row:  # 官方盤後資料最後寫入，同日以官方為準
                     merge(st, [row])
             else:
-                st["exchange"] = "US"
+                st["exchange"] = "INDEX" if market == "IDX" else "US"  # 指數（^TWII、^GSPC）也用 Yahoo
                 merge(st, fetch_yahoo(code, srng or "5d"))
             last = st["history"][-1] if st["history"] else None
             print(f"✓ {code:<6} {st.get('name','')}  {last['d'] if last else '-'}  {last['c'] if last else '-'}")
